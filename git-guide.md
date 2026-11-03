@@ -1,6 +1,6 @@
 # Git·GitHub 처음 쓰는 학생을 위한 안내
 
-Git을 한 번도 써 보지 않은 학생을 위한 단계별 안내입니다. 세종대학교 음향 연구실(`acoustics-sejong`)의 모든 프로젝트에 공통으로 적용됩니다. 프로젝트별 규칙(데이터 위치, 실험 기록, 담당 팀)은 각 프로젝트 저장소의 README와 CONTRIBUTING(참여 안내)을 따릅니다. Windows PC와 VS Code를 기준으로 합니다.
+Git을 한 번도 써 보지 않은 학생을 위한 단계별 안내입니다. 세종대학교 AI로봇학과 지능형 음향 및 센싱 연구실(GitHub 조직 `acoustics-sejong`)의 모든 프로젝트에 공통으로 적용됩니다. 프로젝트별 규칙(데이터 위치, 실험 기록, 담당 팀)은 각 프로젝트 저장소의 README와 CONTRIBUTING(참여 안내)을 따릅니다. Windows PC와 VS Code를 기준으로 합니다.
 
 Google Colab에서 노트북으로 작업한다면 [Colab·Gemini 작업 안내](colab-guide.md)도 함께 봅니다.
 
