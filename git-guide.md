@@ -253,12 +253,21 @@ Windows 줄바꿈 변환 안내입니다. 무시해도 됩니다.
 
 ### push할 때 `rejected ... (fetch first)` 또는 `non-fast-forward`
 
-GitHub의 같은 branch에 내 PC에 없는 commit이 있다는 뜻입니다. 받아온 뒤 다시 push합니다.
+GitHub의 같은 branch에 내 PC에 없는 commit이 있다는 뜻입니다. 먼저 지금 어느 branch에 있는지 확인합니다.
 
 ```bash
-git pull
-git push
+git branch --show-current
 ```
+
+- **`main`이 나오면** 아무것도 더 실행하지 말고, 아래 ["실수로 `main`에서 작업했음"](#실수로-main에서-작업했음)의 "commit했지만 push하지 않았다면" 절차를 따릅니다. `main`에 직접 올리면 PR 검토를 건너뛰게 됩니다.
+- **내 작업 branch가 나오면** GitHub의 변경을 받아온 뒤 다시 push합니다.
+
+  ```bash
+  git pull
+  git push
+  ```
+
+  `git pull`에서 충돌이 나면 아래 "충돌" 절차로 해결한 뒤 push합니다.
 
 `--force`로 해결하지 않습니다.
 

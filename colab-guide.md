@@ -46,27 +46,53 @@ Drive의 데이터는 작업용 사본입니다. 데이터를 수정하거나 �
 
 ### ③ 첫 설정 셀
 
-노트북 맨 앞에 Drive 연결, 패키지 설치, 경로 설정을 모아 둡니다. 다른 사람이 처음부터 실행해도 돌아가야 합니다.
+노트북 맨 앞에 패키지 설치, Drive 연결, 경로 설정, 환경 기록을 모아 둡니다. 다른 사람이 처음부터 실행해도 돌아가야 합니다.
+
+**셀 1: 패키지 설치.** 필요한 패키지를 버전까지 적고 주석(`#`)을 지웁니다. 설치할 패키지가 없으면 셀을 비워 둡니다.
 
 ```python
-!pip install 패키지==버전
+# !pip install numpy==1.26.4
+```
 
+**셀 2: 경로와 결과 폴더.**
+
+```python
 from pathlib import Path
 from google.colab import drive
 drive.mount('/content/drive')
 
 PROJECT_DIR = Path('/content/drive/MyDrive/프로젝트이름')
 DATA_ID = '데이터ID'
-RUN_ID = '2026-11-03_사용자명_run01'   # 실험마다 새 ID
+RUN_ID = '2026-11-03_사용자명_run01'   # 새 실험마다 새 ID
+RESUME = False                          # 중단된 실험을 이어갈 때만 True
 
 DATA_DIR = PROJECT_DIR / 'data' / DATA_ID
 RUN_DIR = PROJECT_DIR / 'runs' / RUN_ID
-RUN_DIR.mkdir(parents=True, exist_ok=True)
+
+if RESUME:
+    assert RUN_DIR.exists(), f'이어갈 실험 폴더가 없습니다: {RUN_DIR}'
+else:
+    RUN_DIR.mkdir(parents=True, exist_ok=False)   # 같은 ID의 폴더가 있으면 오류
 ```
 
-- 그림, CSV, 가중치, 환경 기록은 모두 `RUN_DIR` 아래에 저장합니다. Colab의 `/content` 폴더는 런타임이 끝나면 지워집니다.
+**셀 3: 환경 기록.** 학습을 시작하기 전에 기록하므로, 학습이 중간에 끊겨도 남습니다. 파일 이름에 시각을 붙여 이어서 실행할 때도 이전 기록을 덮지 않습니다.
+
+```python
+import shutil
+from datetime import datetime
+ENV_TAG = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+!python --version > {RUN_DIR}/python_version_{ENV_TAG}.txt
+!pip freeze > {RUN_DIR}/requirements_{ENV_TAG}.txt
+if shutil.which('nvidia-smi'):        # GPU 런타임에서만
+    !nvidia-smi > {RUN_DIR}/nvidia_smi_{ENV_TAG}.txt
+```
+
+- 그림, CSV, 가중치는 모두 `RUN_DIR` 아래에 저장합니다. Colab의 `/content` 폴더는 런타임이 끝나면 지워집니다.
 - 셀마다 경로를 직접 쓰지 않고 `DATA_DIR`, `RUN_DIR`만 씁니다.
-- 실험 ID 형식은 프로젝트 README를 따릅니다. 이전 실험 폴더를 덮어쓰지 않도록 실행마다 `RUN_ID`를 바꿉니다.
+- 실험 ID 형식은 프로젝트 README를 따릅니다.
+- `FileExistsError`가 나면 이미 쓴 실험 ID입니다. 새 실험이면 `RUN_ID`를 바꿉니다. 이전 폴더를 지우거나 덮어쓰지 않습니다.
+- **중단된 실험을 이어갈 때만** `RUN_ID`를 그 실험의 ID로, `RESUME = True`로 두고, 불러올 체크포인트를 파일 이름까지 직접 지정합니다(예: `CKPT = RUN_DIR / 'ckpt_step01000.pt'`). "가장 최근 파일"을 자동으로 고르게 하지 않습니다.
 
 ### ④ GitHub에 저장 (= commit)
 
@@ -95,28 +121,29 @@ RUN_DIR.mkdir(parents=True, exist_ok=True)
 
 노트북을 GitHub에 저장해도, 열려 있는 런타임에는 이전에 실행한 셀의 함수와 변수가 남아 있습니다. 예를 들어 residual 함수를 고쳐 저장한 뒤 그 셀을 다시 실행하지 않으면, 기록에는 새 commit이 남지만 학습에는 이전 함수가 쓰입니다. 그래서 공식 실험은 다음 순서를 지킵니다.
 
-1. **저장**: 노트북을 GitHub 내 branch에 저장합니다(2절 ④). `RUN_ID`도 새 실험 ID로 바꾼 뒤 저장합니다.
-2. **기록**: GitHub의 내 branch → **Commits**에서 맨 위 commit ID를 복사하고, 데이터 ID와 함께 실험 기록 이슈에 먼저 적습니다.
-3. **새 런타임**: Colab **런타임 → 런타임 연결 해제 및 삭제**를 누른 뒤, GitHub에서 그 branch의 노트북을 다시 엽니다(2절 ②).
-4. **처음부터 실행**: **런타임 → 모두 실행**으로 첫 셀부터 순서대로 실행합니다. 중간 셀만 골라 실행하지 않습니다.
-5. **결과 보관**: `RUN_DIR`의 결과를 프로젝트 결과 보관 위치의 같은 실험 ID 폴더로 복사하고, 실험 기록 이슈에 링크합니다.
+branch 이름으로 노트북을 열면, 기록한 뒤 그 branch에 새 commit이 생겼을 때 기록과 다른 버전을 실행하게 됩니다. 그래서 실행할 노트북은 **commit ID로 고정해서** 엽니다.
 
-**실행 중에 코드를 고쳤다면** 그 실행은 공식 결과로 쓰지 않습니다. 다시 저장(commit)하고 새 실험 ID로 1번부터 실행합니다.
+1. **저장**: `RUN_ID`를 새 실험 ID로 바꾸고 노트북을 GitHub 내 branch에 저장합니다(2절 ④).
+2. **기록**: GitHub의 내 branch → **Commits**에서 방금 만든 commit(맨 위, 내 commit 메시지인지 확인) 오른쪽의 복사 버튼을 눌러 **전체 commit ID**(40자)를 복사합니다. 데이터 ID와 함께 실험 기록 이슈에 먼저 적습니다.
+3. **새 런타임**: Colab **런타임 → 런타임 연결 해제 및 삭제**를 누릅니다.
+4. **commit ID로 열기**: 브라우저 주소창에 다음 주소를 넣어 노트북을 엽니다. `전체commitID` 자리에 2번에서 복사한 값을 넣습니다.
 
-환경 기록은 노트북 마지막 부분에 다음 셀을 두어 같은 실행에서 남깁니다.
+   ```text
+   https://colab.research.google.com/github/acoustics-sejong/저장소이름/blob/전체commitID/notebooks/파일이름.ipynb
+   ```
 
-```python
-!python --version > {RUN_DIR}/python_version.txt
-!pip freeze > {RUN_DIR}/requirements.txt
-!nvidia-smi > {RUN_DIR}/nvidia_smi.txt
-```
+   이 창은 실행 전용입니다. 여기서 코드를 고치거나 GitHub에 저장하지 않습니다.
+5. **처음부터 실행**: **런타임 → 모두 실행**으로 첫 셀부터 순서대로 실행합니다. 중간 셀만 골라 실행하지 않습니다.
+6. **결과 보관**: `RUN_DIR`의 결과를 프로젝트 결과 보관 위치의 같은 실험 ID 폴더로 복사하고, 실험 기록 이슈에 링크합니다.
+
+**실행 중에 코드를 고쳤다면** 그 실행은 공식 결과로 쓰지 않습니다. branch로 연 노트북에서 고쳐 다시 저장하고, 새 실험 ID로 1번부터 실행합니다.
 
 | 기록 항목 | Colab에서 확인하는 방법 |
 |---|---|
-| Git commit ID | 위 2번에서 복사한 ID |
+| Git commit ID | 위 2번에서 복사한 전체 ID (4번 주소에 넣은 값과 같음) |
 | 실행 당시 미커밋 변경 | 위 절차를 지켰다면 "없음" |
-| Python·라이브러리 버전 | `RUN_DIR`의 `python_version.txt`, `requirements.txt` |
-| 실행 장치 | 런타임 유형(T4, L4, A100 등)과 `nvidia_smi.txt` |
+| Python·라이브러리 버전 | `RUN_DIR`의 `python_version_*.txt`, `requirements_*.txt` (셀 3) |
+| 실행 장치 | 런타임 유형(T4, L4, A100 등)과 `nvidia_smi_*.txt` |
 
 Colab 무료 런타임은 중간에 끊길 수 있습니다. 긴 학습은 일정 반복마다 가중치를 `RUN_DIR`에 저장하도록 작성합니다. 끊긴 뒤 이어서 학습했다면 실험 기록에 그 사실을 적습니다.
 
@@ -128,7 +155,7 @@ Colab 무료 런타임은 중간에 끊길 수 있습니다. 긴 학습은 일�
 - **물리·수식 정의는 프로젝트 README를 기준으로 확인합니다.** 시간 규약과 부호, 좌표 축 순서, 단위와 정규화는 Gemini가 다른 관례로 쓰는 경우가 많습니다.
 - **"돌아간다"와 "맞다"는 다릅니다.** 손실이 줄어드는 것만으로 맞다고 판단하지 않고, 프로젝트의 구현 점검 절차로 확인합니다.
 - **PR 본문에 적습니다.** 예: "residual 계산 셀은 Gemini 초안을 바탕으로 작성, 부호와 배율을 README 식과 대조함".
-- Gemini가 추천하는 패키지를 설치할 때는 버전을 고정해 첫 설정 셀에 모읍니다.
+- Gemini가 추천하는 패키지를 설치할 때는 버전을 고정해 셀 1에 모읍니다.
 
 ## 5. 자주 겪는 문제
 
@@ -140,6 +167,7 @@ Colab 무료 런타임은 중간에 끊길 수 있습니다. 긴 학습은 일�
 | 다른 사람이 같은 노트북을 수정함 | 덮어쓰지 말고 프로젝트 MS Teams 채널에서 누구의 버전을 기준으로 할지 정함 |
 | Drive 사본과 GitHub 버전을 각각 수정해 내용이 달라짐 | 아래 "두 사본 합치기" 참고 |
 | `pip freeze` 등에서 `No such file or directory` | 첫 설정 셀(③)을 실행하지 않아 `RUN_DIR`이 없는 경우. 첫 셀부터 다시 실행 |
+| 셀 2에서 `FileExistsError` | 이미 쓴 실험 ID. 새 실험이면 `RUN_ID`를 바꾸고, 중단된 실험을 이어가는 경우에만 `RESUME = True` |
 | 런타임이 끊겨 결과가 사라짐 | 결과를 `/content`가 아닌 `RUN_DIR`에 저장하도록 수정 |
 
 ### 두 사본 합치기
